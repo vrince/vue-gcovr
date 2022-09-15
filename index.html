@@ -17,10 +17,10 @@
         <v-toolbar-title class="text-h5 ml-2">
           <span class="font-weight-thin">vue</span><span class="font-weight-medium">gcovr</span>
         </v-toolbar-title>
-        <v-text-field v-model="search" prepend-icon="mdi-magnify" clearable solo dense class="text-h6 ml-4 mt-6"></v-text-field>
+        <v-text-field v-model="search" prepend-inner-icon="mdi-magnify" clearable solo dense class="text-h6 ml-4 mt-6  d-none d-lg-inline"></v-text-field>
         <coverage-chip class="ml-4" title="line" :data="summary.line"></coverage-chip>
-        <coverage-chip class="ml-2 d-none d-lg-block" title="branch" :data="summary.branch"></coverage-chip>
-        <coverage-chip class="ml-2 d-none d-lg-block" title="function" :data="summary.function"></coverage-chip>
+        <coverage-chip class="ml-2" title="branch" :data="summary.branch"></coverage-chip>
+        <coverage-chip class="ml-2" title="function" :data="summary.function"></coverage-chip>
         <v-btn icon @click="$vuetify.theme.dark=!$vuetify.theme.dark">
             <v-icon>mdi-brightness-6</v-icon>
           </v-btn>
