@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦄</text></svg>">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@mdi/font@6.x/css/materialdesignicons.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+  <title>vue-gcovr</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+</head>
+
+<body>
+  <div id="app">
+    <v-app id="ei3-data-collect">
+      <v-app-bar app>
+        <v-toolbar-title class="text-h5 ml-2">
+          <span class="font-weight-thin">vue</span><span class="font-weight-medium">gcovr</span>
+        </v-toolbar-title>
+        <v-text-field v-model="search" prepend-icon="mdi-magnify" clearable solo dense class="text-h6 ml-4 mt-6"></v-text-field>
+        <coverage-chip class="ml-4" title="line" :data="summary.line"></coverage-chip>
+        <coverage-chip class="ml-2 d-none d-lg-block" title="branch" :data="summary.branch"></coverage-chip>
+        <coverage-chip class="ml-2 d-none d-lg-block" title="function" :data="summary.function"></coverage-chip>
+        <v-btn icon @click="$vuetify.theme.dark=!$vuetify.theme.dark">
+            <v-icon>mdi-brightness-6</v-icon>
+          </v-btn>
+      </v-app-bar>
+      <v-main>
+        <v-container fluid>
+          <v-alert v-for="error in errors" :key="JSON.stringify(error)" class="ma-3" type="error" text dismissible>
+            {{error}}
+          </v-alert>
+          <v-toolbar-title>File coverage</v-toolbar-title>
+          <v-data-table :headers="headers" :items="files" :search="search" dense fixed-header :items-per-page="-1" disable-pagination hide-default-footer>
+            <template v-slot:item.filename="{item}"><filename-span :filename="item.filename"/></template>
+            <template v-slot:item.line="{item}"><coverage-ratio :data="item.line"/></template>
+            <template v-slot:item.line_percent="{item}"><percent-chip small :value="item.line_percent"/></template>
+            <template v-slot:item.branch="{item}"><coverage-ratio :data="item.branch"/></template>
+            <template v-slot:item.branch_percent="{item}"><percent-chip small v-if="item.branch_percent!=null" :value="item.branch_percent"/></template>
+            <template v-slot:item.function="{item}"><coverage-ratio :data="item.function"/></template>
+            <template v-slot:item.function_percent="{item}"><percent-chip small v-if="item.function_percent!=null" :value="item.function_percent"/></template>
+          </v-data-table>
+        </v-container>
+      </v-main>
+    </v-app>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+
+  <script>
+    var color = function(value) { return value > 90 ? "success" : value > 75 ? "warning" : "error"}
+    var PercentChip = Vue.extend({
+      props: ['value', 'small'],
+      methods: { color: color},
+      template: '<v-chip :small="small" :color="color(value)">{{value}}%</v-chip>'
+    })
+    var CoverageRatio = Vue.extend({
+      props: ['data'],
+      template: '<span class="ml-2 font-weight-thin">{{data.covered}} / {{data.total}}</span>'
+    })
+    var CoverageSpan = Vue.extend({
+      props: ['data'],
+      template: '<span><coverage-ratio :data="data"/><percent-chip class="ml-4" :value="data.percent"/></span>'
+    })
+    var CoverageChip = Vue.extend({
+      props: ['data', 'title'],
+      methods: { color: color},
+      template: '<v-alert v-if="data" :color="color(data.percent)" border="left" colored-border dense class="mt-4">{{title}}<coverage-span :data="data"></coverage-span></v-chip>'
+    })
+    var FilenameSpan = Vue.extend({
+      props: ['filename'],
+      computed: {
+        name: function () { return this.filename.split('/').pop() },
+        path: function () { return this.filename.split('/').slice(0, -1).join('/') },
+      },
+      template: '<span><span class="font-weight-thin">{{path}}/</span><span class="font-weight-medium">{{name}}</span></span>'
+    })
+    Vue.component('percent-chip', PercentChip)
+    Vue.component('coverage-ratio', CoverageRatio)
+    Vue.component('coverage-span', CoverageSpan)
+    Vue.component('coverage-chip', CoverageChip)
+    Vue.component('filename-span', FilenameSpan)
+    new Vue({
+      el: '#app',
+      vuetify: new Vuetify({
+        theme: {
+          dark: true
+        }
+      }),
+      data: () => ({
+        base_url: '/',
+        input: 'coverage-summary.json',
+        summary: {},
+        files: [],
+        errors: [],
+        search: null,
+        headers: [
+          { text: 'File Name', value: 'filename'},
+          { text: 'Line', value: 'line', width: 100, sortable: false},
+          { text: '%', value: 'line_percent', width: 40 },
+          { text: 'Branch', value: 'branch', width: 100, sortable: false},
+          { text: '%', value: 'branch_percent', width: 40 },
+          { text: 'Function', value: 'function', width: 100, sortable: false},
+          { text: '%', value: 'function_percent', width: 40 }
+        ],
+      }),
+      computed: {
+      },
+      methods: {
+        load_coverage_summary: function () {
+          fetch(this.base_url + '/' + this.input)
+          .then(response => response.json())
+          .then(data => {
+            this.files = data.files.map(e => this.extract_coverage(e))
+            let summary = data
+            delete summary.files
+            this.summary = this.extract_coverage(summary)
+          })
+          .catch((error) => {
+            this.errors.push(error)
+          });
+        },
+        set: function (obj, path, val) { 
+          const keys = path.split('_');
+          const lastKey = keys.pop();
+          const lastObj = keys.reduce((obj, key) => obj[key] = obj[key] || {}, obj); 
+          lastObj[lastKey] = val;
+        },
+        extract_coverage: function(obj) {
+          let result = {}
+          for (const [key, value] of Object.entries(obj)) {
+            if (!key.match(/^line|^branch|^function|filename/g))
+              continue
+            this.set(result, key, value);
+            if (key.match(/percent$/g))
+              result[key] = value
+          }
+          return result
+        }
+      },
+      watch: {
+      },
+      mounted: function () {
+        this.load_coverage_summary()
+      },
+      created() {
+        this.base_url = window.location.pathname.split('/').slice(0, -1).join('/')
+      },
+    })
+  </script>
+</body>
+
+</html>
